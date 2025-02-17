@@ -7,8 +7,9 @@ let browser;
 
 app.use(express.static(path.join(__dirname, "public")));
 
-async function initializeBrowser() {
+async function initializeBrowser(userAgent) {
     if (!browser) {
+        console.log("Launching Puppeteer with user agent:", userAgent);
         browser = await puppeteer.launch({
             headless: "new",
             args: [
@@ -16,7 +17,7 @@ async function initializeBrowser() {
                 "--disable-infobars",
                 "--disable-web-security",
                 "--disable-features=IsolateOrigins,site-per-process",
-                "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.5112.102 Safari/537.36"
+                `--user-agent=${userAgent}`
             ]
         });
     }
@@ -25,7 +26,8 @@ async function initializeBrowser() {
 
 async function loginToFacebook(email, password) {
     try {
-        browser = await initializeBrowser();
+        console.log("Logging in to Facebook...");
+        browser = await initializeBrowser("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.5112.102 Safari/537.36");
         const page = await browser.newPage();
         await page.goto("https://www.facebook.com/");
 
@@ -68,10 +70,12 @@ async function loginToFacebook(email, password) {
 
 app.get("/info", async (req, res) => {
     try {
+        console.log("Launching Puppeteer to fetch system info...");
         const browser = await puppeteer.launch({ headless: "new" });
         const version = await browser.version();
         const page = await browser.newPage();
         const userAgent = await page.evaluate(() => navigator.userAgent);
+        console.log("User agent detected:", userAgent);
         await browser.close();
 
         res.json({
@@ -94,6 +98,6 @@ app.get("/appstate", async (req, res) => {
 
 const PORT = process.env.PORT || 7568;
 app.listen(PORT, async () => {
-    await initializeBrowser();
+    console.log("Starting server...");
     console.log(`Express server is running on http://localhost:${PORT}`);
 });
