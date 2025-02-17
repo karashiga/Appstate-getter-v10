@@ -1,44 +1,27 @@
 const express = require("express");
 const puppeteer = require("puppeteer");
-const { exec } = require("child_process");
-const { promisify } = require("util");
-const freeport = require("freeport");
-const ProxyChain = require("proxy-chain");
 const path = require("path");
-const axios = require("axios");
 
 const app = express();
 let browser;
 
 app.use(express.static(path.join(__dirname, "public")));
 
-async function initializeBrowser(proxyPort) {
-    return puppeteer.launch({
-        headless: false,
-        args: [
-            "--no-sandbox",
-            "--disable-setuid-sandbox",
-            "--disable-gpu",
-            "--disable-software-rasterizer",
-            "--disable-dev-shm-usage",
-            "--ignore-certificate-errors",
-            `--proxy-server=127.0.0.1:${proxyPort}`
-        ]
-    });
-}
-
-async function findFreePort() {
-    return new Promise((resolve, reject) => {
-        freeport((err, port) => {
-            if (err) reject(err);
-            else resolve(port);
+async function initializeBrowser() {
+    if (!browser) {
+        console.log("🔄 Launching Puppeteer...");
+        browser = await puppeteer.launch({
+            headless: true, // Set to 'true' for headless mode
+            args: ["--no-sandbox", "--disable-setuid-sandbox"]
         });
-    });
+        console.log("✅ Puppeteer is ready and running!");
+    }
+    return browser;
 }
 
 async function getBrowserInfo() {
     if (!browser) return { error: "No active browser instance found." };
-    
+
     const version = await browser.version();
     const page = await browser.newPage();
     const userAgent = await page.userAgent();
@@ -47,9 +30,10 @@ async function getBrowserInfo() {
     return { version, userAgent };
 }
 
-async function loginToFacebook(email, password, proxyPort) {
+async function loginToFacebook(email, password) {
     try {
-        browser = await initializeBrowser(proxyPort);
+        console.log("🔄 Processing Facebook login...");
+        browser = await initializeBrowser();
         const page = await browser.newPage();
         await page.goto("https://www.facebook.com/");
 
@@ -64,7 +48,7 @@ async function loginToFacebook(email, password, proxyPort) {
         const cookies = await page.cookies();
         const loginFailed = await page.$('input[name="email"]');
         if (loginFailed) {
-            await browser.close();
+            console.log("❌ Login failed: Wrong username or password.");
             return { error: "Wrong username or password. Please try again." };
         }
 
@@ -79,64 +63,35 @@ async function loginToFacebook(email, password, proxyPort) {
             sameSite: cookie.sameSite,
             secure: cookie.secure,
             session: cookie.session,
+            storeId: cookie.storeId,
             value: cookie.value
         }));
 
         const datrCookie = cookies.find(cookie => cookie.name === "datr") || {};
 
-        await browser.close();
+        console.log("✅ Facebook login successful!");
         return { cookies: cookieString, jsonCookies, datr: datrCookie.value || null };
     } catch (error) {
-        console.error("Error during Facebook login:", error);
-        if (browser) await browser.close();
-        throw error;
+        console.error("❌ Error during Facebook login:", error);
+        return { error: "An error occurred during the login process." };
     }
 }
 
-async function startProxy() {
-    const proxyPort = await findFreePort();
-    const proxyServer = new ProxyChain.Server({ port: proxyPort });
+app.get("/appstate", async (req, res) => {
+    const { e: email, p: password } = req.query;
+    if (!email || !password) return res.status(400).json({ error: "Email and password are required." });
 
-    return new Promise((resolve, reject) => {
-        proxyServer.listen((err) => {
-            if (err) reject(err);
-            else {
-                console.log(`Proxy server started on port ${proxyPort}`);
-                resolve({ proxyPort, proxyServer });
-            }
-        });
-    });
-}
+    const result = await loginToFacebook(email, password);
+    return res.json(result);
+});
 
-async function startProxyAndServer() {
-    try {
-        const { proxyPort } = await startProxy();
+app.get("/info", async (req, res) => {
+    const info = await getBrowserInfo();
+    return res.json(info);
+});
 
-        app.get("/appstate", async (req, res) => {
-            const { e: email, p: password } = req.query;
-            if (!email || !password) return res.status(400).json({ error: "Email and password are required." });
-
-            try {
-                const result = await loginToFacebook(email, password, proxyPort);
-                return res.json(result);
-            } catch (error) {
-                console.error("Error during login:", error);
-                return res.status(500).json({ error: "An error occurred during the login process." });
-            }
-        });
-
-        app.get("/info", async (req, res) => {
-            const info = await getBrowserInfo();
-            return res.json(info);
-        });
-
-        const PORT = process.env.PORT || 7568;
-        app.listen(PORT, () => {
-            console.log(`Express server is running on http://localhost:${PORT}`);
-        });
-    } catch (err) {
-        console.error("Error initializing the proxy and server:", err);
-    }
-}
-
-startProxyAndServer();
+const PORT = process.env.PORT || 7568;
+app.listen(PORT, async () => {
+    await initializeBrowser(); // Ensure Puppeteer is running at startup
+    console.log(`🚀 Express server is running on http://localhost:${PORT}`);
+});
