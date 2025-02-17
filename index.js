@@ -4,7 +4,7 @@ const path = require('path');
 const axios = require('axios');
 
 const app = express();
-
+app.use(express.static(path.join(__dirname, 'public')));
 async function getBrowserInfo() {
   try {
     console.log('Launching Puppeteer browser...');
