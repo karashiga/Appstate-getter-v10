@@ -1,35 +1,34 @@
-# Use an official Node.js runtime as a parent image
-FROM node:18-bullseye
+# Use a valid Node.js base image
+FROM node:18  
 
-# Set the working directory in the container
-WORKDIR /app
-
-# Copy package.json and package-lock.json before running npm install
-COPY package*.json ./
-
-# Install dependencies
-RUN npm install
-
-# Install Chromium dependencies
+# Update and install required dependencies
 RUN apt-get update && apt-get install -y \
-    chromium \
-    libatk-bridge2.0-0 \
-    libnss3 \
-    libxss1 \
+    libgbm1 \
     libasound2 \
+    libnss3 \
+    libatk1.0-0 \
+    libx11-xcb1 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxrandr2 \
+    libgbm-dev \
     libgtk-3-0 \
-    --no-install-recommends && \
-    rm -rf /var/lib/apt/lists/*
+    libpango-1.0-0 \
+    libcairo2 \
+    libatspi2.0-0 \
+    libdrm2 \
+    libxshmfence1 \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy the rest of the application
-COPY . .
+# Set working directory inside the container
+WORKDIR /app  
 
-# Expose the port the app runs on
-EXPOSE 7568
+# Copy package files and install dependencies
+COPY package*.json ./
+RUN npm install  
 
-# Set environment variables
-ENV PORT=7568
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+# Copy all project files
+COPY . .  
 
-# Start the application
+# Set the command to run the bot
 CMD ["node", "index.js"]
