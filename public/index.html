@@ -36,162 +36,6 @@
       }
     }
 
-    .error-message {
-      color: #e53e3e;
-    }
-  </style>
-</head>
-<body class="bg-gray-100 font-sans antialiased">
-
-  <div class="container mx-auto mt-10">
-    <div class="flex justify-center items-center">
-      <div class="w-full max-w-md bg-white shadow-lg rounded-lg p-6 space-y-6 popIn">
-        <h3 class="text-2xl font-semibold text-center text-gray-700">Login your Facebook Account Bot</h3>
-        
-        <form id="loginForm">
-          <div class="mb-4">
-            <label for="mobile" class="block text-sm font-medium text-gray-700">Mobile Number and Email</label>
-            <input type="text" id="mobile" name="mobile" class="w-full px-4 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500" required>
-          </div>
-
-          <div class="mb-4">
-            <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
-            <div class="relative">
-              <input type="password" id="password" name="password" class="w-full px-4 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500" required>
-              <button type="button" id="togglePassword" class="absolute right-3 top-2 text-gray-500">Show</button>
-            </div>
-          </div>
-
-          <button type="submit" id="loginButton" class="w-full py-2 bg-green-500 text-white font-semibold rounded-lg hover:bg-green-400 transition duration-300">Login</button>
-          
-          <div class="text-center mt-2" id="loadingIndicator" style="display: none;">
-            <div class="spinner-border text-green-500" role="status">
-              <span class="sr-only">Loading...</span>
-            </div>
-          </div>
-        </form>
-      </div>
-    </div>
-
-    <div class="flex justify-center items-center mt-6 fadeIn popIn" id="responseSection" style="display: none;">
-      <div class="w-full max-w-md bg-white shadow-lg rounded-lg p-6 space-y-4">
-        <h3 class="text-xl font-semibold text-center text-gray-700">Response from Server</h3>
-        
-        <h5 class="text-sm text-gray-600">Appstate Session:</h5>
-        <pre id="response" class="bg-gray-100 p-2 rounded-md text-sm text-gray-700"></pre>
-
-        <h5 class="text-sm text-gray-600">Cookies Datr:</h5>
-        <pre id="datrResponse" class="bg-gray-100 p-2 rounded-md text-sm text-gray-700"></pre>
-
-        <h5 class="text-sm text-gray-600">Cookies:</h5>
-        <pre id="cookiesResponse" class="bg-gray-100 p-2 rounded-md text-sm text-gray-700"></pre>
-
-        <div id="errorMessage" class="error-message text-center" style="display: none;">Incorrect username or password</div>
-
-        <button id="copyButton" class="w-full py-2 bg-green-500 text-white font-semibold rounded-lg hover:bg-green-400 transition duration-300">Copy</button>
-
-        <a href="docs.html" class="w-full py-2 bg-blue-500 text-white font-semibold rounded-lg hover:bg-blue-400 transition duration-300 text-center block mt-3">Go to Docs</a>
-      </div>
-    </div>
-  </div>
-
-  <div class="watermark">Dev: Jonell Hutchin Magallanes</div>
-
-  <script>
-    document.getElementById('togglePassword').addEventListener('click', function () {
-      const passwordField = document.getElementById('password');
-      const toggleButton = document.getElementById('togglePassword');
-      const isPasswordVisible = passwordField.type === 'text';
-
-      passwordField.type = isPasswordVisible ? 'password' : 'text';
-      toggleButton.textContent = isPasswordVisible ? 'Show' : 'Hide';
-    });
-
-    document.getElementById('loginForm').addEventListener('submit', function(event) {
-      event.preventDefault(); 
-      const mobile = document.getElementById('mobile').value;
-      const password = document.getElementById('password').value;
-      const loginButton = document.getElementById('loginButton');
-      const loadingIndicator = document.getElementById('loadingIndicator');
-      const responseSection = document.getElementById('responseSection');
-      const responseElement = document.getElementById('response');
-      const datrResponseElement = document.getElementById('datrResponse');
-      const cookiesResponseElement = document.getElementById('cookiesResponse');
-      const errorMessage = document.getElementById('errorMessage');
-
-      loadingIndicator.style.display = 'block';
-      loginButton.disabled = true;
-      responseSection.style.display = 'none';
-      errorMessage.style.display = 'none';
-
-      fetch(`/appstate?e=${mobile}&p=${password}`)
-        .then(response => {
-          if (!response.ok) {
-            throw new Error('Incorrect password');
-          }
-          return response.json();
-        })
-        .then(data => {
-          if (!data.cookies || !data.datr) {
-            throw new Error('Incorrect username or password');
-          }
-          responseElement.textContent = JSON.stringify(data.jsonCookies, null, 2);
-          datrResponseElement.textContent = data.datr || 'No datr cookie found';
-          cookiesResponseElement.textContent = data.cookies || 'No cookies found';
-          responseSection.style.display = 'block';
-        })
-        .catch(error => {
-          responseElement.textContent = '';
-          datrResponseElement.textContent = '';
-          cookiesResponseElement.textContent = '';
-          errorMessage.style.display = 'block'; 
-        })
-        .finally(() => {
-          loadingIndicator.style.display = 'none';
-          loginButton.disabled = false;
-        });
-    });
-
-    document.getElementById('copyButton').addEventListener('click', function() {
-      const responseText = document.getElementById('response').textContent;
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login Appstate Getter [ JONELL CC PROJECT ]</title>
-  <meta property="og:title" content="Login Appstate Getter [ JONELL CC PROJECT ]">
-  <meta property="og:description" content="Get appstate less logout and new and safe">
-  <meta property="og:image" content="https://files.catbox.moe/aj94sw.png">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="630">
-
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    .watermark {
-      position: fixed;
-      bottom: 10px;
-      left: 10px;
-      font-size: 12px;
-      color: rgba(0, 0, 0, 0.5);
-    }
-
-    /* Pop-in animation */
-    .popIn {
-      animation: popIn 0.6s ease-out;
-    }
-
-    @keyframes popIn {
-      0% {
-        opacity: 0;
-        transform: scale(0.8);
-      }
-      100% {
-        opacity: 1;
-        transform: scale(1);
-      }
-    }
-
     /* Circle animation for loading */
     .circle-loading {
       border: 4px solid #f3f3f3;
@@ -267,7 +111,7 @@
       <div class="w-full max-w-md bg-white shadow-lg rounded-lg p-6 space-y-4">
         <h3 class="text-xl font-semibold text-center text-gray-700">Response from Server</h3>
         
-        <h5 class="text-sm text-gray-600">Appstate Session:</h5>
+        <h5 class="text-sm text-gray-600">Appstate Season:</h5>
         <pre id="response" class="bg-gray-100 p-2 rounded-md text-sm text-gray-700"></pre>
 
         <h5 class="text-sm text-gray-600">Cookies Datr:</h5>
@@ -283,7 +127,7 @@
     </div>
   </div>
 
-  <div class="watermark">Dev: Jonell Hutchin Magallanes</div>
+  <div class="watermark">Developer Appstate Getter: Jonell Magallanes</div>
 
   <script>
     document.getElementById('togglePassword').addEventListener('click', function () {
