@@ -9,30 +9,22 @@ app.use(express.static(path.join(__dirname, "public")));
 
 async function initializeBrowser() {
     if (!browser) {
-        console.log("🔄 Launching Puppeteer...");
         browser = await puppeteer.launch({
-            headless: true, // Set to 'true' for headless mode
-            args: ["--no-sandbox", "--disable-setuid-sandbox"]
+            headless: "new",
+            args: [
+                "--no-sandbox",
+                "--disable-infobars",
+                "--disable-web-security",
+                "--disable-features=IsolateOrigins,site-per-process",
+                "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.5112.102 Safari/537.36"
+            ]
         });
-        console.log("✅ Puppeteer is ready and running!");
     }
     return browser;
 }
 
-async function getBrowserInfo() {
-    if (!browser) return { error: "No active browser instance found." };
-
-    const version = await browser.version();
-    const page = await browser.newPage();
-    const userAgent = await page.userAgent();
-    await page.close();
-
-    return { version, userAgent };
-}
-
 async function loginToFacebook(email, password) {
     try {
-        console.log("🔄 Processing Facebook login...");
         browser = await initializeBrowser();
         const page = await browser.newPage();
         await page.goto("https://www.facebook.com/");
@@ -48,7 +40,6 @@ async function loginToFacebook(email, password) {
         const cookies = await page.cookies();
         const loginFailed = await page.$('input[name="email"]');
         if (loginFailed) {
-            console.log("❌ Login failed: Wrong username or password.");
             return { error: "Wrong username or password. Please try again." };
         }
 
@@ -69,13 +60,29 @@ async function loginToFacebook(email, password) {
 
         const datrCookie = cookies.find(cookie => cookie.name === "datr") || {};
 
-        console.log("✅ Facebook login successful!");
         return { cookies: cookieString, jsonCookies, datr: datrCookie.value || null };
     } catch (error) {
-        console.error("❌ Error during Facebook login:", error);
         return { error: "An error occurred during the login process." };
     }
 }
+
+app.get("/info", async (req, res) => {
+    try {
+        const browser = await puppeteer.launch({ headless: "new" });
+        const version = await browser.version();
+        const page = await browser.newPage();
+        const userAgent = await page.evaluate(() => navigator.userAgent);
+        await browser.close();
+
+        res.json({
+            puppeteer_version: require("puppeteer/package.json").version,
+            browser_version: version,
+            user_agent: userAgent,
+        });
+    } catch (error) {
+        res.status(500).json({ error: "Failed to fetch system info" });
+    }
+});
 
 app.get("/appstate", async (req, res) => {
     const { e: email, p: password } = req.query;
@@ -85,13 +92,8 @@ app.get("/appstate", async (req, res) => {
     return res.json(result);
 });
 
-app.get("/info", async (req, res) => {
-    const info = await getBrowserInfo();
-    return res.json(info);
-});
-
 const PORT = process.env.PORT || 7568;
 app.listen(PORT, async () => {
-    await initializeBrowser(); // Ensure Puppeteer is running at startup
-    console.log(`🚀 Express server is running on http://localhost:${PORT}`);
+    await initializeBrowser();
+    console.log(`Express server is running on http://localhost:${PORT}`);
 });
