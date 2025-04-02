@@ -3,14 +3,14 @@ const puppeteer = require('puppeteer');
 const path = require('path');
 
 const app = express();
-
 app.use(express.static(path.join(__dirname, 'public')));
 
-async function loginToFacebook(email, password) {
+const DEFAULT_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36';
+
+async function loginToFacebook(email, password, userAgent, proxy) {
     let browser;
     try {
-        console.log("Launching browser...");
-        browser = await puppeteer.launch({
+        const launchOptions = {
             headless: true,
             args: [
                 '--no-sandbox',
@@ -18,13 +18,22 @@ async function loginToFacebook(email, password) {
                 '--disable-software-rasterizer',
                 '--disable-dev-shm-usage'
             ]
-        });
+        };
 
+        if (proxy) {
+            launchOptions.args.push(`--proxy-server=${proxy}`);
+        }
+
+        browser = await puppeteer.launch(launchOptions);
         const page = await browser.newPage();
-        console.log("Navigating to Facebook...");
-        await page.goto('https://www.facebook.com/');
 
-        console.log("Typing email and password...");
+        if (userAgent) {
+            await page.setUserAgent(userAgent);
+        } else {
+            await page.setUserAgent(DEFAULT_USER_AGENT);
+        }
+
+        await page.goto('https://www.facebook.com/');
         await page.type('#email', email, { delay: 100 });
         await page.type('#pass', password, { delay: 100 });
 
@@ -41,7 +50,6 @@ async function loginToFacebook(email, password) {
         }
 
         const cookieString = cookies.map(cookie => `${cookie.name}=${cookie.value}`).join('; ');
-
         const jsonCookies = cookies.map(cookie => ({
             domain: cookie.domain,
             expirationDate: cookie.expires,
@@ -57,7 +65,6 @@ async function loginToFacebook(email, password) {
         }));
 
         const datrCookie = cookies.find(cookie => cookie.name === 'datr') || {};
-
         const responseWithDatr = {
             cookies: cookieString,
             jsonCookies,
@@ -66,54 +73,45 @@ async function loginToFacebook(email, password) {
 
         await browser.close();
         return responseWithDatr;
-
     } catch (error) {
-        console.error('Error during Facebook login:', error);
         if (browser) await browser.close();
         throw error;
     }
 }
 
 app.get('/appstate', async (req, res) => {
-    const { e: email, p: password } = req.query;
+    const { e: email, p: password, ua: userAgent, proxy } = req.query;
 
     if (!email || !password) {
         return res.status(400).json({ error: 'Email and password are required.' });
     }
 
     try {
-        console.log("Attempting to log in...");
-        const result = await loginToFacebook(email, password);
-
+        const result = await loginToFacebook(email, password, userAgent, proxy);
         if (result.error) {
             return res.status(400).json({ error: result.error });
         }
-
-        console.log("Login successful. Returning cookies...");
         return res.json(result);
     } catch (error) {
-        console.error('Error during login:', error);
         return res.status(500).json({ error: 'An error occurred during the login process.' });
     }
 });
 
 app.get('/info', async (req, res) => {
     try {
-        console.log("Launching Puppeteer to gather browser info...");
         const browser = await puppeteer.launch({ headless: true });
         const version = await browser.version();
         const page = await browser.newPage();
         const userAgent = await page.evaluate(() => navigator.userAgent);
         await browser.close();
 
-        console.log("Successfully fetched browser info.");
         res.json({
             puppeteer_version: require("puppeteer/package.json").version,
             browser_version: version,
             user_agent: userAgent,
+            default_user_agent: DEFAULT_USER_AGENT
         });
     } catch (error) {
-        console.error("Failed to fetch system info:", error);
         res.status(500).json({ error: "Failed to fetch system info" });
     }
 });
