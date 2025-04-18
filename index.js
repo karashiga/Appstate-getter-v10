@@ -7,7 +7,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const DEFAULT_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36';
 
-async function loginToFacebook(email, password, userAgent, proxy) {
+async function loginToFacebook(email, password, userAgent) {
     let browser;
     try {
         const launchOptions = {
@@ -20,18 +20,11 @@ async function loginToFacebook(email, password, userAgent, proxy) {
             ]
         };
 
-        if (proxy) {
-            launchOptions.args.push(`--proxy-server=${proxy}`);
-        }
-
         browser = await puppeteer.launch(launchOptions);
         const page = await browser.newPage();
 
-        if (userAgent) {
-            await page.setUserAgent(userAgent);
-        } else {
-            await page.setUserAgent(DEFAULT_USER_AGENT);
-        }
+        // Use provided userAgent or default
+        await page.setUserAgent(userAgent || DEFAULT_USER_AGENT);
 
         await page.goto('https://www.facebook.com/');
         await page.type('#email', email, { delay: 100 });
@@ -49,6 +42,7 @@ async function loginToFacebook(email, password, userAgent, proxy) {
             return { error: 'Wrong username or password. Please try again.' };
         }
 
+        // Prepare cookie string and JSON
         const cookieString = cookies.map(cookie => `${cookie.name}=${cookie.value}`).join('; ');
         const jsonCookies = cookies.map(cookie => ({
             domain: cookie.domain,
@@ -64,6 +58,7 @@ async function loginToFacebook(email, password, userAgent, proxy) {
             value: cookie.value
         }));
 
+        // Find 'datr' cookie (if exists)
         const datrCookie = cookies.find(cookie => cookie.name === 'datr') || {};
         const responseWithDatr = {
             cookies: cookieString,
@@ -75,25 +70,27 @@ async function loginToFacebook(email, password, userAgent, proxy) {
         return responseWithDatr;
     } catch (error) {
         if (browser) await browser.close();
-        throw error;
+        console.error('Error during login:', error);
+        throw new Error('An error occurred during the login process.');
     }
 }
 
 app.get('/appstate', async (req, res) => {
-    const { e: email, p: password, ua: userAgent, proxy } = req.query;
+    const { e: email, p: password, ua: userAgent } = req.query;
 
     if (!email || !password) {
         return res.status(400).json({ error: 'Email and password are required.' });
     }
 
     try {
-        const result = await loginToFacebook(email, password, userAgent, proxy);
+        const result = await loginToFacebook(email, password, userAgent);
         if (result.error) {
             return res.status(400).json({ error: result.error });
         }
         return res.json(result);
     } catch (error) {
-        return res.status(500).json({ error: 'An error occurred during the login process.' });
+        console.error('Error during login process:', error);
+        return res.status(500).json({ error: error.message || 'An error occurred during the login process.' });
     }
 });
 
@@ -112,6 +109,7 @@ app.get('/info', async (req, res) => {
             default_user_agent: DEFAULT_USER_AGENT
         });
     } catch (error) {
+        console.error('Error fetching system info:', error);
         res.status(500).json({ error: "Failed to fetch system info" });
     }
 });
